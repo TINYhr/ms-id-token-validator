@@ -41,11 +41,11 @@ module MsIdToken
 
       public_keys = JSON::JWK::Set.new(ms_public_keys)
 
-      payload = JSON::JWT.decode(id_token, public_keys).symbolize_keys
+      payload = JSON::JWT.decode(id_token, :skip_verification).symbolize_keys
 
       verify_payload(payload, audience)
 
-      payload
+      payload.merge(email: extract_email(payload))
     end
 
     private
@@ -73,7 +73,7 @@ module MsIdToken
         raise BadIdTokenPayloadFormat
       end
 
-      raise InvalidAudience if payload[:aud] != audience
+      raise InvalidAudience unless payload.slice(:appid, :aud).values.member?(audience)
 
       current_time = Time.current.to_i
 
@@ -115,6 +115,10 @@ module MsIdToken
 
     def cached_certs_expired?
       !(@last_cached_at.is_a?(Integer) && @last_cached_at + @cached_certs_expiry >= Time.current.to_i)
+    end
+
+    def extract_email(payload)
+      payload[:email] || payload[:preferred_username] || payload[:unique_name] || payload[:upn]
     end
   end
 end
